@@ -59,38 +59,41 @@ class Migration(DataMigration):
             url = self.get_actual_url(df)
             if not url:
                 continue
+            try:
+                with closing(urlopen(url)) as f:
+                    md5 = hashlib.new('md5')
+                    sha512 = hashlib.new('sha512')
+                    size = 0
 
-            with closing(urlopen(url)) as f:
-                md5 = hashlib.new('md5')
-                sha512 = hashlib.new('sha512')
-                size = 0
+                    def get_chunk():
+                        return f.read(32 * sha512.block_size)
 
-                def get_chunk():
-                    return f.read(32 * sha512.block_size)
+                    for chunk in iter(get_chunk, ''):
+                        size += len(chunk)
+                        md5.update(chunk)
+                        sha512.update(chunk)
 
-                for chunk in iter(get_chunk, ''):
-                    size += len(chunk)
-                    md5.update(chunk)
-                    sha512.update(chunk)
+                    if df.size and int(df.size) != size:
+                        raise Exception("Size does not match: %d should be %s" % \
+                                        (size, df.size))
 
-                if df.size and int(df.size) != size:
-                    raise Exception("Size does not match: %d should be %s" % \
-                                    (size, df.size))
+                    md5sum = md5.hexdigest()
+                    if df.md5sum and df.md5sum != md5sum:
+                        raise Exception("MD5 does not match: %s should be %s" % \
+                                        (df.md5sum, md5sum))
 
-                md5sum = md5.hexdigest()
-                if df.md5sum and df.md5sum != md5sum:
-                    raise Exception("MD5 does not match: %s should be %s" % \
-                                    (df.md5sum, md5sum))
+                    df.md5sum = md5sum
+                    df.sha512sum = sha512.hexdigest()
+                    df.size = size
+                    df.verified = True
+                    df.save()
 
-                df.md5sum = md5sum
-                df.sha512sum = sha512.hexdigest()
-                df.size = size
-                df.verified = True
-                df.save()
-
-                # Show progress
-                sys.stdout.write('.')
-                sys.stdout.flush()
+                    # Show progress
+                    sys.stdout.write('.')
+                    sys.stdout.flush()
+            except:
+                with open('/tmp/0017_tardis.log', 'a') as f:
+                    f.write("Datafile #%d cannot be resolved: %s\n" % (df.id, df.url))
         print ""
         print "Successfully verified all files."
 
