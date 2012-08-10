@@ -288,22 +288,16 @@ class Dataset_File(models.Model):
         md5sum, sha512sum, size, mimetype_buffer = read_file(sourcefile,
                                                              tempfile)
 
-        if not (self.size and size == int(self.size)):
-            if (self.sha512sum or self.md5sum) and not self.size: 
-                # If the size is missing but we have a checksum to check
-                # the missing size is harmless ... we will fill it in below.
-                logger.warn("%s size is missing" % (self.url))
-            else:
-                logger.error("%s failed size check: %d != %s" %
-                            (self.url, size, self.size))
-                return False
+        # Temporary fixup ... skip size checking, and if the size field
+        # is missing, treat that as meaning that the checksums are bogus
+        # and fix them.
 
-        if self.sha512sum and sha512sum.lower() != self.sha512sum.lower():
+        if self.size and self.sha512sum and sha512sum.lower() != self.sha512sum.lower():
             logger.error("%s failed SHA-512 sum check: %s != %s" %
                          (self.url, sha512sum, self.sha512sum))
             return False
 
-        if self.md5sum and md5sum.lower() != self.md5sum.lower():
+        if self.size and self.md5sum and md5sum.lower() != self.md5sum.lower():
             logger.error("%s failed MD5 sum check: %s != %s" %
                          (self.url, md5sum, self.md5sum))
             return False
