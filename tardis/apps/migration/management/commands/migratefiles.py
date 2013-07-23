@@ -346,6 +346,8 @@ class Command(BaseCommand):
     def _do_reclaim(self, required):
         scores = self._do_score_all()
         total = 0
+        if self.verbosity > 1:
+            self.stdout.write("Attempting to reclaim %s bytes\n" % required)
         for entry in scores:
             if total >= required:
                 break
@@ -361,11 +363,11 @@ class Command(BaseCommand):
                                           (replica.url, datafile.id, 
                                            datafile.size))
             if self.dryRun:
-                total += int(datafile.size) 
+                total += long(datafile.size) 
             else:
                 try:
                     if migrate_replica(replica, self.dest):
-                        total += int(datafile.size) 
+                        total += long(datafile.size) 
                         self.transfer_count += 1
                 except MigrationError as e:              
                     self.stderr.write(
